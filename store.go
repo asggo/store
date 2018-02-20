@@ -32,7 +32,7 @@ func (s *Store) DeleteBucket(bucket string) error {
     })
 }
 
-func (s *Store) Create(bucket, key string, value []byte) error {
+func (s *Store) Write(bucket, key string, value []byte) error {
     err := s.db.Update(func(tx *bolt.Tx) error {
         b := tx.Bucket([]byte(bucket))
         if b == nil {
@@ -75,20 +75,6 @@ func (s *Store) Delete(bucket, key string) error {
     return err
 }
 
-func (s *Store) Update(bucket, key string, value []byte) error {
-    err := s.Delete(bucket, key)
-    if err != nil {
-        return err
-    }
-
-    err = s.Create(bucket, key, value)
-    if err != nil {
-        return err
-    }
-
-    return nil
-}
-
 func (s *Store) AllKeys(bucket string) ([]string, error) {
     var keys []string
 
@@ -116,12 +102,12 @@ func (s *Store) AllKeys(bucket string) ([]string, error) {
 func (s *Store) FindKeys(bucket, needle string) ([]string, error) {
     var keys []string
 
-    keys, err := s.AllKeys(bucket)
+    allKeys, err := s.AllKeys(bucket)
     if err != nil {
         return keys, err
     }
 
-    for _, key := range keys {
+    for _, key := range allKeys {
         if strings.Contains(key, needle) {
             keys = append(keys, key)
         }
