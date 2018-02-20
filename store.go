@@ -1,3 +1,49 @@
+// store provides a simple wrapper for the Bolt key/value database. store allows
+// you to create and delete buckets in the root of the database and allows you
+// to read, write, and delete key/value pairs within a bucket. Currently, store
+// does not support nested buckets.
+//
+// Usage:
+//
+// Storing Key/Value Pairs
+// s := NewStore("/path/to/database/file")
+// err := s.CreateBucket("bucketname")
+// if err != nil {
+//     log.Println("Could not create bucket.")
+// }
+//
+// err = s.Write("bucketname", "key", []byte("value"))
+// if err != nil {
+//     log.Println("Could not write key/value pair.")
+// }
+//
+// val = s.Read("bucketname", "key")
+// err = s.Delete("bucketname", "key")
+// if err != nil {
+//     log.Println("Could not delete key.")
+// }
+//
+//
+// Searching for Keys
+// s := NewStore("/path/to/database/file")
+// keys, err := s.AllKeys("bucketname")
+// if err != nil {
+//     fmt.Println("Could not get keys.")
+// }
+//
+// for _, key := range keys {
+//     // do something with key
+// }
+//
+// // Get all keys with bucket in the name.
+// keys, err := s.FindKeys("bucket")
+// if err != nil {
+//     fmt.Println("Could not get keys.")
+// }
+//
+// for _, key := range keys {
+//     // do something with key
+// }
 package store
 
 import (
@@ -129,6 +175,7 @@ func (s *Store) FindKeys(bucket, needle string) ([]string, error) {
 	return keys, nil
 }
 
+// Close closes the connection to the bolt database.
 func (s *Store) Close() error {
 	return s.db.Close()
 }
