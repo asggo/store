@@ -1,135 +1,148 @@
 package store
 
 import (
-    "fmt"
-    "strings"
-    "time"
+	"fmt"
+	"strings"
+	"time"
 
-    "github.com/boltdb/bolt"
+	"github.com/boltdb/bolt"
 )
 
 var BucketNotExist = fmt.Errorf("store: bucket does not exist.")
 var BucketNotCreated = fmt.Errorf("store: bucket not created.")
 
+// Store holds the bolt database
 type Store struct {
-    db  *bolt.DB
+	db *bolt.DB
 }
 
+// CreateBucket creates a new bucket with the given name at the root of the
+// database. An error is returned if the bucket cannot be created.
 func (s *Store) CreateBucket(bucket string) error {
-    return s.db.Update(func(tx *bolt.Tx) error {
-        _, err := tx.CreateBucketIfNotExists([]byte(bucket))
-        if err != nil {
-            return BucketNotCreated
-        }
+	return s.db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(bucket))
+		if err != nil {
+			return BucketNotCreated
+		}
 
-        return nil
-    })
+		return nil
+	})
 }
 
+// DeleteBucket deletes the bucket with the given name from the root of the
+// database. Returns an error if the bucket cannot be deleted.
 func (s *Store) DeleteBucket(bucket string) error {
-    return s.db.Update(func(tx *bolt.Tx) error {
-        return tx.DeleteBucket([]byte(bucket))
-    })
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.DeleteBucket([]byte(bucket))
+	})
 }
 
+// Write stores the given key/value pair in the given bucket.
 func (s *Store) Write(bucket, key string, value []byte) error {
-    err := s.db.Update(func(tx *bolt.Tx) error {
-        b := tx.Bucket([]byte(bucket))
-        if b == nil {
-            return BucketNotExist
-        }
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return BucketNotExist
+		}
 
-        return b.Put([]byte(key), []byte(value))
-    })
+		return b.Put([]byte(key), []byte(value))
+	})
 
-    return err
+	return err
 }
 
+// Read gets the value associated with the given key in the given bucket. If the
+// key does not exist, Read returns nil.
 func (s *Store) Read(bucket, key string) []byte {
-    var val []byte
+	var val []byte
 
-    s.db.View(func(tx *bolt.Tx) error {
-        b := tx.Bucket([]byte(bucket))
-        if b == nil {
-            return BucketNotExist
-        }
+	s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return BucketNotExist
+		}
 
-        val = b.Get([]byte(key))
+		val = b.Get([]byte(key))
 
-        return nil
-    })
+		return nil
+	})
 
-    return val
+	return val
 }
 
+// Delete removes a key/value pair from the given bucket. An error is returned
+// if the key/value pair cannot be deleted.
 func (s *Store) Delete(bucket, key string) error {
-    err := s.db.Update(func(tx *bolt.Tx) error {
-        b := tx.Bucket([]byte(bucket))
-        if b == nil {
-            return BucketNotExist
-        }
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return BucketNotExist
+		}
 
-        return b.Delete([]byte(key))
-    })
+		return b.Delete([]byte(key))
+	})
 
-    return err
+	return err
 }
 
+// AllKeys returns all of the keys in the given bucket.
 func (s *Store) AllKeys(bucket string) ([]string, error) {
-    var keys []string
+	var keys []string
 
-    err := s.db.Update(func(tx *bolt.Tx) error {
-        b := tx.Bucket([]byte(bucket))
-        if b == nil {
-            return BucketNotExist
-        }
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return BucketNotExist
+		}
 
-        b.ForEach(func(k, v []byte) error {
-            keys = append(keys, string(k))
-            return nil
-        })
+		b.ForEach(func(k, v []byte) error {
+			keys = append(keys, string(k))
+			return nil
+		})
 
-        return nil
-    })
+		return nil
+	})
 
-    if err != nil {
-        return keys, err
-    }
+	if err != nil {
+		return keys, err
+	}
 
-    return keys, nil
+	return keys, nil
 }
 
+// FindKeys returns all keys, whose name contains the given string, from the
+// given bucket.
 func (s *Store) FindKeys(bucket, needle string) ([]string, error) {
-    var keys []string
+	var keys []string
 
-    allKeys, err := s.AllKeys(bucket)
-    if err != nil {
-        return keys, err
-    }
+	allKeys, err := s.AllKeys(bucket)
+	if err != nil {
+		return keys, err
+	}
 
-    for _, key := range allKeys {
-        if strings.Contains(key, needle) {
-            keys = append(keys, key)
-        }
-    }
+	for _, key := range allKeys {
+		if strings.Contains(key, needle) {
+			keys = append(keys, key)
+		}
+	}
 
-    return keys, nil
+	return keys, nil
 }
 
 func (s *Store) Close() error {
-    return s.db.Close()
+	return s.db.Close()
 }
 
 // Create a new store object with a bolt database located at filePath.
 func NewStore(filePath string) (*Store, error) {
-    s := new(Store)
+	s := new(Store)
 
-    db, err := bolt.Open(filePath, 0640, &bolt.Options{Timeout: 1 * time.Second})
-    if err != nil {
-        return s, err
-    }
+	db, err := bolt.Open(filePath, 0640, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		return s, err
+	}
 
-    s.db = db
+	s.db = db
 
-    return s, nil
+	return s, nil
 }
