@@ -83,6 +83,44 @@ func (s *Store) DeleteBucket(bucket string) error {
 	})
 }
 
+// AllBuckets returns a list of all the buckets in the root of the database.
+func (s *Store) AllBuckets() ([]string, error) {
+	var buckets []string
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		tx.ForEach(func(k, v []byte) error {
+			buckets = append(buckets, string(k))
+			return nil
+		})
+
+		return nil
+	})
+
+	if err != nil {
+		return buckets, err
+	}
+
+	return buckets, nil
+}
+
+// FindBuckets returns all buckets, whose name contains the given string.
+func (s *Store) FindBuckets(needle string) ([]string, error) {
+	var buckets []string
+
+	allBuckets, err := s.AllBuckets()
+	if err != nil {
+		return buckets, err
+	}
+
+	for _, bucket := range allBuckets {
+		if strings.Contains(bucket, needle) {
+			buckets = append(buckets, bucket)
+		}
+	}
+
+	return buckets, nil
+}
+
 // Write stores the given key/value pair in the given bucket.
 func (s *Store) Write(bucket, key string, value []byte) error {
 	err := s.db.Update(func(tx *bolt.Tx) error {
@@ -135,7 +173,7 @@ func (s *Store) Delete(bucket, key string) error {
 func (s *Store) AllKeys(bucket string) ([]string, error) {
 	var keys []string
 
-	err := s.db.Update(func(tx *bolt.Tx) error {
+	err := s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
 			return BucketNotExist
