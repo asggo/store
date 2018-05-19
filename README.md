@@ -53,8 +53,8 @@ The AllBuckets and FindBuckets methods allow you to get a list of buckets. The A
 
 ## Variables
 
-var BucketNotCreated = fmt.Errorf("store: bucket not created.")
-var BucketNotExist = fmt.Errorf("store: bucket does not exist.")
+    var BucketNotCreated = fmt.Errorf("store: bucket not created.")
+    var BucketNotExist = fmt.Errorf("store: bucket does not exist.")
 
 # Types
 Store holds the bolt database
@@ -64,41 +64,46 @@ Store holds the bolt database
     }
 
 # Methods
-func NewStore(filePath string) (*Store, error)
-    Create a new store object with a bolt database located at filePath.
+Create a new store object with a bolt database located at filePath.
 
-func (s *Store) AllBuckets() ([]string, error)
-    AllBuckets returns a list of all the buckets in the root of the
-    database.
+    func NewStore(filePath string) (*Store, error)
 
-func (s *Store) AllKeys(bucket string) ([]string, error)
-    AllKeys returns all of the keys in the given bucket.
+AllBuckets returns a list of all the buckets in the root of the database.
 
-func (s *Store) Close() error
-    Close closes the connection to the bolt database.
+    func (s *Store) AllBuckets() ([]string, error)
 
-func (s *Store) CreateBucket(bucket string) error
-    CreateBucket creates a new bucket with the given name at the root of the
-    database. An error is returned if the bucket cannot be created.
+AllKeys returns all of the keys in the given bucket.
 
-func (s *Store) Delete(bucket, key string) error
-    Delete removes a key/value pair from the given bucket. An error is
-    returned if the key/value pair cannot be deleted.
+    func (s *Store) AllKeys(bucket string) ([]string, error)
 
-func (s *Store) DeleteBucket(bucket string) error
-    DeleteBucket deletes the bucket with the given name from the root of the
-    database. Returns an error if the bucket cannot be deleted.
+Close closes the connection to the bolt database.
 
-func (s *Store) FindBuckets(needle string) ([]string, error)
-    FindBuckets returns all buckets, whose name contains the given string.
+    func (s *Store) Close() error
 
-func (s *Store) FindKeys(bucket, needle string) ([]string, error)
-    FindKeys returns all keys, whose name contains the given string, from
-    the given bucket.
+CreateBucket creates a new bucket with the given name at the root of the database. An error is returned if the bucket cannot be created.
 
-func (s *Store) Read(bucket, key string) []byte
-    Read gets the value associated with the given key in the given bucket.
-    If the key does not exist, Read returns nil.
+    func (s *Store) CreateBucket(bucket string) error
 
-func (s *Store) Write(bucket, key string, value []byte) error
-    Write stores the given key/value pair in the given bucket.
+Delete removes a key/value pair from the given bucket. An error is returned if the key/value pair cannot be deleted.
+
+    func (s *Store) Delete(bucket, key string) error
+
+DeleteBucket deletes the bucket with the given name from the root of the database. Returns an error if the bucket cannot be deleted.
+
+    func (s *Store) DeleteBucket(bucket string) error
+
+FindBuckets returns all buckets, whose name contains the given string.
+
+    func (s *Store) FindBuckets(needle string) ([]string, error)
+
+FindKeys returns all keys, whose name contains the given string, from the given bucket.
+
+    func (s *Store) FindKeys(bucket, needle string) ([]string, error)
+
+Read gets the value associated with the given key in the given bucket. If the key does not exist, Read returns nil.
+
+    func (s *Store) Read(bucket, key string) []byte
+
+Write stores the given key/value pair in the given bucket.
+
+    func (s *Store) Write(bucket, key string, value []byte) error
