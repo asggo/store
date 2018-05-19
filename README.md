@@ -56,14 +56,14 @@ The AllBuckets and FindBuckets methods allow you to get a list of buckets. The A
     var BucketNotCreated = fmt.Errorf("store: bucket not created.")
     var BucketNotExist = fmt.Errorf("store: bucket does not exist.")
 
-# Types
+## Types
 Store holds the bolt database
 
     type Store struct {
         // contains filtered or unexported fields
     }
 
-# Methods
+## Methods
 Create a new store object with a bolt database located at filePath.
 
     func NewStore(filePath string) (*Store, error)
