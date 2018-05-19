@@ -1,30 +1,30 @@
 # store
-import "github.com/asggo/store/"
+The store package provides a simple wrapper for the Bolt key/value database. store allows you to create and delete buckets in the root of the database and allows you to read, write, and delete key/value pairs within a bucket. Store does not support nested buckets.
 
-store provides a simple wrapper for the Bolt key/value database. store allows you to create and delete buckets in the root of the database and allows you to read, write, and delete key/value pairs within a bucket. Store does not support nested buckets.
+    import "github.com/asggo/store/"
 
 ## Usage
 
 ### Storing Key/Value Pairs
+All keys are stored in buckets. Keys can be created and updated with the Write method. Keys can be viewed with the Read method and deleted with the Delete method.
 
-    s := NewStore("/path/to/database/file") err :=
-    s.CreateBucket("bucketname") if err != nil {
+    s := NewStore("/path/to/database/file")
 
-	log.Println("Could not create bucket.")
-
+    err := s.CreateBucket("bucketname")
+    if err != nil {
+        log.Println("Could not create bucket.")
     }
 
-    err = s.Write("bucketname", "key", []byte("value")) if err != nil {
-
-	log.Println("Could not write key/value pair.")
-
+    err = s.Write("bucketname", "key", []byte("value"))
+    if err != nil {
+        log.Println("Could not write key/value pair.")
     }
 
-    val = s.Read("bucketname", "key") err = s.Delete("bucketname", "key") if
-    err != nil {
+    val = s.Read("bucketname", "key")
 
-	log.Println("Could not delete key.")
-
+    err = s.Delete("bucketname", "key")
+    if err != nil {
+        log.Println("Could not delete key.")
     }
 
 
@@ -33,7 +33,8 @@ The AllBuckets and FindBuckets methods allow you to get a list of buckets. The A
 
     s := NewStore("/path/to/database/file")
 
-    keys, err := s.AllKeys("bucketname") if err != nil {
+    keys, err := s.AllKeys("bucketname")
+    if err != nil {
         fmt.Println("Could not get keys.")
     }
 
@@ -41,8 +42,8 @@ The AllBuckets and FindBuckets methods allow you to get a list of buckets. The A
         // do something with key
     }
 
-    // Get all keys with bucket in the name.
-    keys, err := s.FindKeys("bucket")
+    // Get all keys in the test bucket with key in the name.
+    keys, err := s.FindKeys("test", "key")
     if err != nil {
         fmt.Println("Could not get keys.")
     }
@@ -107,3 +108,26 @@ Read gets the value associated with the given key in the given bucket. If the ke
 Write stores the given key/value pair in the given bucket.
 
     func (s *Store) Write(bucket, key string, value []byte) error
+
+# kv
+In addition to the store package this repository includes kv.go, which can be compiled and added to the system PATH. kv provides a scriptable interface to a store database.
+
+## Compilation
+
+    go build -o kv kv.go
+
+## Usage
+
+    kv filename action [arguments]
+
+    Actions:
+    add <bucketname>                 Add a new bucket to the database.
+    add <bucketname> <key> <value>   Add the key/value to the bucket.
+    get                              Get a list of buckets.
+    get <bucketname>                 Get a list of keys in a bucket.
+    get <bucketname> <key>           Get the value of the key in the bucket.
+    del <bucketname>                 Delete the bucket and its keys.
+    del <bucketname> <key>           Delete the key/value in the bucket
+    find <string>                    Find buckets, which contain the string.
+    find <bucketname> <string>       Find keys in the bucket, which contain
+                                     the string.
