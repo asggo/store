@@ -88,8 +88,8 @@ func (s *Store) AllBuckets() ([]string, error) {
 	var buckets []string
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		tx.ForEach(func(k, v []byte) error {
-			buckets = append(buckets, string(k))
+		tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
+			buckets = append(buckets, string(name))
 			return nil
 		})
 
