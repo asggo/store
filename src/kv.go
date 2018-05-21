@@ -22,6 +22,7 @@ Actions:
 	find <string>                    Find buckets, which contain the string.
 	find <bucketname> <string>       Find keys in the bucket, which contain
 	                                 the string.
+	backup <filename>                Backup the database to this file.
 	`
 	fmt.Println(u)
 	os.Exit(1)
@@ -30,7 +31,6 @@ Actions:
 // add <bucketname>                 Adds a new bucket to the database.
 // add <bucketname> <key> <value>   Add the key/value to the bucket.
 func add(db *store.Store, args []string) {
-	fmt.Println(args)
 	switch len(args) {
 	case 1:
 		err := db.CreateBucket(args[0])
@@ -123,6 +123,19 @@ func find(db *store.Store, args []string) {
 	}
 }
 
+func backup(db *store.Store, args []string) {
+	switch len(args) {
+	case 1:
+		err := db.Backup(args[0])
+		if err != nil {
+			fmt.Printf("Could not backup database to %s: %s\n", args[0], err)
+			return
+		}
+	default:
+		help()
+	}
+}
+
 func main() {
 	if len(os.Args) < 3 {
 		help()
@@ -146,6 +159,8 @@ func main() {
 		delete(db, os.Args[3:])
 	case "find":
 		find(db, os.Args[3:])
+	case "backup":
+		backup(db, os.Args[3:])
 	default:
 		help()
 	}
