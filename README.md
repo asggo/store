@@ -114,7 +114,7 @@ In addition to the store package this repository includes kv.go, which can be co
 
 ## Compilation
 
-    go build -o kv kv.go
+    go build -o kv github.com/asggo/store/src
 
 ## Usage
 
