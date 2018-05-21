@@ -48,6 +48,7 @@ package store
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -211,6 +212,23 @@ func (s *Store) FindKeys(bucket, needle string) ([]string, error) {
 	}
 
 	return keys, nil
+}
+
+// Backup the database to the given file.
+func (s *Store) Backup(filename string) error {
+	err := s.db.View(func(tx *bolt.Tx) error {
+		file, e := os.Create(filename)
+		if e != nil {
+			return e
+		}
+
+		defer file.Close()
+
+		_, e = tx.WriteTo(file)
+		return e
+	})
+
+	return err
 }
 
 // Close closes the connection to the bolt database.
