@@ -17,6 +17,9 @@ Actions:
 	get                              Get a list of buckets.
 	get <bucketname>                 Get a list of keys in a bucket.
 	get <bucketname> <key>           Get the value of the key in the bucket.
+	val <bucketname>                 Get a list of values in a bucket.
+	val <bucketname> <string>        Get a list of values in a bucket, which
+	                                 contain the string.
 	del <bucketname>                 Delete the bucket and its keys.
 	del <bucketname> <key>           Delete the key/value in the bucket
 	find <string>                    Find buckets, which contain the string.
@@ -96,7 +99,7 @@ func delete(db *store.Store, args []string) {
 	}
 }
 
-// find <string>                Find all buckts in the database, which contain the string.
+// find <string>                Find all buckets in the database, which contain the string.
 // find <bucketname> <string>   Find all keys in the bucket, which contain the string.
 func find(db *store.Store, args []string) {
 	var items []string
@@ -111,7 +114,34 @@ func find(db *store.Store, args []string) {
 	case 2:
 		items, err = db.FindKeys(args[0], args[1])
 		if err != nil {
-			fmt.Printf("Could not find keys matching %s in bucket %s: %s\n", args[0], args[1], err)
+			fmt.Printf("Could not find keys matching %s in bucket %s: %s\n", args[1], args[0], err)
+			return
+		}
+	default:
+		help()
+	}
+
+	for _, item := range items {
+		fmt.Println(item)
+	}
+}
+
+// val <bucketname>            Return all values in the bucket.
+// val <bucketname> <string>   Return all values in the bucket, which contain the string.
+func val(db *store.Store, args []string) {
+	var items []string
+	var err error
+
+	switch len(args) {
+	case 1:
+		items, err = db.AllVals(args[0])
+		if err != nil {
+			fmt.Printf("Could not get values from bucket %s: %s\n", args[0], err)
+		}
+	case 2:
+		items, err = db.FindVals(args[0], args[1])
+		if err != nil {
+			fmt.Printf("Could not find values matching %s in bucket %s: %s\n", args[1], args[0], err)
 			return
 		}
 	default:
@@ -155,6 +185,8 @@ func main() {
 		add(db, os.Args[3:])
 	case "get":
 		get(db, os.Args[3:])
+	case "val":
+		val(db, os.Args[3:])
 	case "del":
 		delete(db, os.Args[3:])
 	case "find":
