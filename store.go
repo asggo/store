@@ -214,6 +214,50 @@ func (s *Store) FindKeys(bucket, needle string) ([]string, error) {
 	return keys, nil
 }
 
+// AllVals returns all of the values in the given bucket.
+func (s *Store) AllVals(bucket string) ([]string, error) {
+	var vals []string
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return BucketNotExist
+		}
+
+		b.ForEach(func(k, v []byte) error {
+			vals = append(vals, string(v))
+			return nil
+		})
+
+		return nil
+	})
+
+	if err != nil {
+		return vals, err
+	}
+
+	return vals, nil
+}
+
+// FindVals returns all values, which contain the given string, from the
+// given bucket.
+func (s *Store) FindVals(bucket, needle string) ([]string, error) {
+	var vals []string
+
+	allVals, err := s.AllVals(bucket)
+	if err != nil {
+		return vals, err
+	}
+
+	for _, val := range allVals {
+		if strings.Contains(string(val), needle) {
+			vals = append(vals, string(val))
+		}
+	}
+
+	return vals, nil
+}
+
 // Backup the database to the given file.
 func (s *Store) Backup(filename string) error {
 	err := s.db.View(func(tx *bolt.Tx) error {
