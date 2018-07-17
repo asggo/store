@@ -19,16 +19,23 @@ Actions:
 	get <bucketname> <key>           Get the value of the key in the bucket.
 	val <bucketname>                 Get a list of values in a bucket.
 	val <bucketname> <string>        Get a list of values in a bucket, which
-	                                 contain the string.
+	                                 contain the string..
+	vbk <bucketname> <string>        Get a list of values where the key contains
+	                                 the string.
 	del <bucketname>                 Delete the bucket and its keys.
 	del <bucketname> <key>           Delete the key/value in the bucket
-	find <string>                    Find buckets, which contain the string.
-	find <bucketname> <string>       Find keys in the bucket, which contain
-	                                 the string.
+	find <string>                    Find buckets whose name contains the string.
+	find <bucketname> <string>       Find keys whose name contain the string.
 	backup <filename>                Backup the database to this file.
 	`
 	fmt.Println(u)
 	os.Exit(1)
+}
+
+func printlist(items []string) {
+	for _, item := range items {
+		fmt.Println(item)
+	}
 }
 
 // add <bucketname>                 Adds a new bucket to the database.
@@ -75,9 +82,7 @@ func get(db *store.Store, args []string) {
 		help()
 	}
 
-	for _, item := range items {
-		fmt.Println(item)
-	}
+	printlist(items)
 }
 
 // delete <bucketname>         Delete the bucket and its keys.
@@ -121,9 +126,30 @@ func find(db *store.Store, args []string) {
 		help()
 	}
 
-	for _, item := range items {
-		fmt.Println(item)
+	printlist(items)
+}
+
+// vbk <bucketname> <string>   Return all values in the bucket whose key contains the string.
+func vbk(db *store.Store, args []string) {
+	var items []string
+
+	switch len(args) {
+	case 2:
+		keys, err := db.FindKeys(args[0], args[1])
+		if err != nil {
+			fmt.Printf("Could not find values for keys matching %s in bucket %s: %s\n", args[1], args[0], err)
+			return
+		}
+
+		for _, key := range keys {
+			val := db.Read(args[0], key)
+			items = append(items, val)
+		}
+	default:
+		help()
 	}
+
+	printlist(items)
 }
 
 // val <bucketname>            Return all values in the bucket.
@@ -148,9 +174,7 @@ func val(db *store.Store, args []string) {
 		help()
 	}
 
-	for _, item := range items {
-		fmt.Println(item)
-	}
+	printlist(items)
 }
 
 func backup(db *store.Store, args []string) {
@@ -189,6 +213,8 @@ func main() {
 		val(db, os.Args[3:])
 	case "del":
 		delete(db, os.Args[3:])
+	case "vbk":
+		vbk(db, os.Args[3:])
 	case "find":
 		find(db, os.Args[3:])
 	case "backup":
