@@ -143,7 +143,7 @@ func vbk(db *store.Store, args []string) {
 
 		for _, key := range keys {
 			val := db.Read(args[0], key)
-			items = append(items, val)
+			items = append(items, string(val))
 		}
 	default:
 		help()
