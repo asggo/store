@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/asggo/store"
 )
@@ -22,6 +24,8 @@ Actions:
 	                                 contain the string..
 	vbk <bucketname> <string>        Get a list of values where the key contains
 	                                 the string.
+	kbv <bucketname> <string>        Get a list of keys where the value contains
+							 		 the string.
 	del <bucketname>                 Delete the bucket and its keys.
 	del <bucketname> <key>           Delete the key/value in the bucket
 	find <string>                    Find buckets whose name contains the string.
@@ -152,29 +156,60 @@ func vbk(db *store.Store, args []string) {
 	printlist(items)
 }
 
-// val <bucketname>            Return all values in the bucket.
-// val <bucketname> <string>   Return all values in the bucket, which contain the string.
-func val(db *store.Store, args []string) {
+// kbv <bucketname> <string>   Return all keys in the bucket whose value contains the string.
+func kbv(db *store.Store, args []string) {
 	var items []string
-	var err error
 
 	switch len(args) {
-	case 1:
-		items, err = db.AllVals(args[0])
-		if err != nil {
-			fmt.Printf("Could not get values from bucket %s: %s\n", args[0], err)
-		}
 	case 2:
-		items, err = db.FindVals(args[0], args[1])
+		keys, err := db.AllKeys(args[0])
 		if err != nil {
-			fmt.Printf("Could not find values matching %s in bucket %s: %s\n", args[1], args[0], err)
+			fmt.Printf("Could not find keys for values matching %s in bucket %s: %s\n", args[1], args[0], err)
 			return
+		}
+
+		for _, key := range keys {
+			val := db.Read(args[0], key)
+			if bytes.Contains(val, []byte(args[1])) {
+				items = append(items, key)
+			}
 		}
 	default:
 		help()
 	}
 
 	printlist(items)
+}
+
+// val <bucketname>            Return all values in the bucket.
+// val <bucketname> <string>   Return all values in the bucket, which contain the string.
+func val(db *store.Store, args []string) {
+	switch len(args) {
+	case 1:
+		keys, err := db.AllKeys(args[0])
+		if err != nil {
+			fmt.Printf("Could not get values from bucket %s: %s\n", args[0], err)
+		}
+
+		for _, key := range keys {
+			val := db.Read(args[0], key)
+			fmt.Println(string(val))
+		}
+	case 2:
+		keys, err := db.AllKeys(args[0])
+		if err != nil {
+			fmt.Printf("Could not find values matching %s in bucket %s: %s\n", args[1], args[0], err)
+		}
+
+		for _, key := range keys {
+			val := string(db.Read(args[0], key))
+			if strings.Contains(val, args[1]) {
+				fmt.Println(val)
+			}
+		}
+	default:
+		help()
+	}
 }
 
 func backup(db *store.Store, args []string) {
@@ -215,6 +250,8 @@ func main() {
 		delete(db, os.Args[3:])
 	case "vbk":
 		vbk(db, os.Args[3:])
+	case "kbv":
+		kbv(db, os.Args[3:])
 	case "find":
 		find(db, os.Args[3:])
 	case "backup":
