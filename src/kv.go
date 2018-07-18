@@ -21,11 +21,11 @@ Actions:
 	get <bucketname> <key>           Get the value of the key in the bucket.
 	val <bucketname>                 Get a list of values in a bucket.
 	val <bucketname> <string>        Get a list of values in a bucket, which
-	                                 contain the string..
-	vbk <bucketname> <string>        Get a list of values where the key contains
-	                                 the string.
-	kbv <bucketname> <string>        Get a list of keys where the value contains
-							 		 the string.
+	                                 contain the string.
+	vbk <bucketname> <string>        Get a list of values where the key
+	                                 contains the string.
+	kbv <bucketname> <string>        Get a list of keys where the value
+	                                 contains the string.
 	del <bucketname>                 Delete the bucket and its keys.
 	del <bucketname> <key>           Delete the key/value in the bucket
 	find <string>                    Find buckets whose name contains the string.
@@ -135,8 +135,6 @@ func find(db *store.Store, args []string) {
 
 // vbk <bucketname> <string>   Return all values in the bucket whose key contains the string.
 func vbk(db *store.Store, args []string) {
-	var items []string
-
 	switch len(args) {
 	case 2:
 		keys, err := db.FindKeys(args[0], args[1])
@@ -147,19 +145,15 @@ func vbk(db *store.Store, args []string) {
 
 		for _, key := range keys {
 			val := db.Read(args[0], key)
-			items = append(items, string(val))
+			fmt.Println(string(val))
 		}
 	default:
 		help()
 	}
-
-	printlist(items)
 }
 
 // kbv <bucketname> <string>   Return all keys in the bucket whose value contains the string.
 func kbv(db *store.Store, args []string) {
-	var items []string
-
 	switch len(args) {
 	case 2:
 		keys, err := db.AllKeys(args[0])
@@ -171,14 +165,12 @@ func kbv(db *store.Store, args []string) {
 		for _, key := range keys {
 			val := db.Read(args[0], key)
 			if bytes.Contains(val, []byte(args[1])) {
-				items = append(items, key)
+				fmt.Println(key)
 			}
 		}
 	default:
 		help()
 	}
-
-	printlist(items)
 }
 
 // val <bucketname>            Return all values in the bucket.
