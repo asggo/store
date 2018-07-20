@@ -195,6 +195,34 @@ func (s *Store) AllKeys(bucket string) ([]string, error) {
 	return keys, nil
 }
 
+// AllKeysPrefix returns all of the keys in the given bucket that contain the
+// given prefix.
+func (s *Store) AllKeysPrefix(bucket, prefix string) ([]string, error) {
+	var keys []string
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return BucketNotExist
+		}
+
+		c := b.Cursor()
+		pre := []byte(prefix)
+
+		for k, v := c.Seek(pre); k != nil && bytes.HasPrefix(k, pre); k, v = c.Next() {
+			keys = append(keys, string(k))
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return keys, err
+	}
+
+	return keys, nil
+}
+
 // FindKeys returns all keys, whose name contains the given string, from the
 // given bucket.
 func (s *Store) FindKeys(bucket, needle string) ([]string, error) {
