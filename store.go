@@ -47,6 +47,7 @@
 package store
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -209,7 +210,7 @@ func (s *Store) AllKeysPrefix(bucket, prefix string) ([]string, error) {
 		c := b.Cursor()
 		pre := []byte(prefix)
 
-		for k, v := c.Seek(pre); k != nil && bytes.HasPrefix(k, pre); k, v = c.Next() {
+		for k, _ := c.Seek(pre); k != nil && bytes.HasPrefix(k, pre); k, _ = c.Next() {
 			keys = append(keys, string(k))
 		}
 
