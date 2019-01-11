@@ -50,14 +50,24 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
-var BucketNotExist = fmt.Errorf("store: bucket does not exist.")
-var BucketNotCreated = fmt.Errorf("store: bucket not created.")
+type WalkFunc func(key string, val []byte)
+
+type batch struct {
+	bucket string
+	items  map[string][]byte
+	next   string
+	count  int
+}
+
+// NewBatch returns a batch struct that can be used with ReadBatch
+func NewBatch(bucket string, count int) *batch {
+	return &batch{bucket: bucket, count: count}
+}
 
 // Store holds the bolt database
 type Store struct {
@@ -69,8 +79,9 @@ type Store struct {
 func (s *Store) CreateBucket(bucket string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucket))
+
 		if err != nil {
-			return BucketNotCreated
+			return fmt.Errorf("store: bucket %s not created: %s", bucket, err)
 		}
 
 		return nil
@@ -81,200 +92,194 @@ func (s *Store) CreateBucket(bucket string) error {
 // database. Returns an error if the bucket cannot be deleted.
 func (s *Store) DeleteBucket(bucket string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.DeleteBucket([]byte(bucket))
-	})
-}
+		err := tx.DeleteBucket([]byte(bucket))
 
-// AllBuckets returns a list of all the buckets in the root of the database.
-func (s *Store) AllBuckets() ([]string, error) {
-	var buckets []string
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
-			buckets = append(buckets, string(name))
-			return nil
-		})
+		if err != nil {
+			return fmt.Errorf("store: could not delete bucket %s: %s", bucket, err)
+		}
 
 		return nil
 	})
-
-	if err != nil {
-		return buckets, err
-	}
-
-	return buckets, nil
 }
 
-// FindBuckets returns all buckets, whose name contains the given string.
-func (s *Store) FindBuckets(needle string) ([]string, error) {
-	var buckets []string
+// Walk executes the WalkFunc on each bucket in the root.
+func (s *Store) Walk(fn WalkFunc) error {
+	return s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Cursor()
 
-	allBuckets, err := s.AllBuckets()
-	if err != nil {
-		return buckets, err
-	}
-
-	for _, bucket := range allBuckets {
-		if strings.Contains(bucket, needle) {
-			buckets = append(buckets, bucket)
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			fn(string(k), v)
 		}
-	}
-
-	return buckets, nil
-}
-
-// Write stores the given key/value pair in the given bucket.
-func (s *Store) Write(bucket, key string, value []byte) error {
-	err := s.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		if b == nil {
-			return BucketNotExist
-		}
-
-		return b.Put([]byte(key), []byte(value))
-	})
-
-	return err
-}
-
-// Read gets the value associated with the given key in the given bucket. If the
-// key does not exist, Read returns nil.
-func (s *Store) Read(bucket, key string) []byte {
-	var val []byte
-
-	s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		if b == nil {
-			return BucketNotExist
-		}
-
-		val = b.Get([]byte(key))
 
 		return nil
 	})
-
-	return val
 }
 
-// Delete removes a key/value pair from the given bucket. An error is returned
-// if the key/value pair cannot be deleted.
-func (s *Store) Delete(bucket, key string) error {
-	err := s.db.Update(func(tx *bolt.Tx) error {
+// WalkBucket executes the WalkBucketFunc on each key, value pair in the bucket.
+func (s *Store) WalkBucket(bucket string, fn WalkFunc) error {
+	return s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
-			return BucketNotExist
+			return fmt.Errorf("store: bucket %s does not exist", bucket)
 		}
 
-		return b.Delete([]byte(key))
-	})
+		c := b.Cursor()
 
-	return err
-}
-
-// AllKeys returns all of the keys in the given bucket.
-func (s *Store) AllKeys(bucket string) ([]string, error) {
-	var keys []string
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		if b == nil {
-			return BucketNotExist
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			fn(string(k), v)
 		}
-
-		b.ForEach(func(k, v []byte) error {
-			keys = append(keys, string(k))
-			return nil
-		})
 
 		return nil
 	})
-
-	if err != nil {
-		return keys, err
-	}
-
-	return keys, nil
 }
 
-// AllKeysPrefix returns all of the keys in the given bucket that contain the
-// given prefix.
-func (s *Store) AllKeysPrefix(bucket, prefix string) ([]string, error) {
-	var keys []string
-
-	err := s.db.View(func(tx *bolt.Tx) error {
+// WalkPrefix executes the WalkFunc on every key/value pair in a bucket where
+// the key matches the given prefix.
+func (s *Store) WalkPrefix(bucket, prefix string, fn WalkFunc) error {
+	return s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
-			return BucketNotExist
+			return fmt.Errorf("store: bucket %s does not exist", bucket)
 		}
 
 		c := b.Cursor()
 		pre := []byte(prefix)
 
-		for k, _ := c.Seek(pre); k != nil && bytes.HasPrefix(k, pre); k, _ = c.Next() {
-			keys = append(keys, string(k))
+		for k, v := c.Seek(pre); k != nil && bytes.HasPrefix(k, pre); k, v = c.Next() {
+			fn(string(k), v)
+		}
+
+		return nil
+	})
+}
+
+// Read key/value pairs from a bucket in batches of count size. Update the
+// batch with the found items.
+func (s *Store) ReadBatch(bt *batch) error {
+	return s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bt.bucket))
+		if b == nil {
+			return fmt.Errorf("store: bucket %s does not exist", bt.bucket)
+		}
+
+		c := b.Cursor()
+
+		bt.items = make(map[string][]byte)
+
+		for k, v := c.Seek([]byte(bt.next)); k != nil && len(bt.items) < bt.count; k, v = c.Next() {
+			bt.items[string(k)] = v
+			bt.next = string(k)
+		}
+
+		if len(bt.items) != bt.count {
+			bt.next = ""
+		}
+
+		return nil
+	})
+}
+
+// Write stores the given key/value pair in the given bucket.
+func (s *Store) Write(bucket, key string, value []byte) error {
+	return s.db.Batch(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return fmt.Errorf("store: bucket %s does not exist", bucket)
+		}
+
+		err := b.Put([]byte(key), value)
+		if err != nil {
+			return fmt.Errorf("store: could not write to key %s in bucket %s: %s", key, bucket, err)
+		}
+
+		return nil
+	})
+}
+
+// Read gets the value associated with the given key in the given bucket. If the
+// key does not exist, Read returns nil.
+func (s *Store) Read(bucket, key string) ([]byte, error) {
+	var val []byte
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return fmt.Errorf("store: bucket %s does not exist", bucket)
+		}
+
+		val = b.Get([]byte(key))
+		if val == nil {
+			return fmt.Errorf("store: key %s does not exit", key)
 		}
 
 		return nil
 	})
 
-	if err != nil {
-		return keys, err
-	}
-
-	return keys, nil
+	return val, err
 }
 
-// FindKeys returns all keys, whose name contains the given string, from the
-// given bucket.
-func (s *Store) FindKeys(bucket, needle string) ([]string, error) {
-	var keys []string
-
-	allKeys, err := s.AllKeys(bucket)
-	if err != nil {
-		return keys, err
-	}
-
-	for _, key := range allKeys {
-		if strings.Contains(key, needle) {
-			keys = append(keys, key)
+// Delete removes a key/value pair from the given bucket. An error is returned
+// if the key/value pair cannot be deleted.
+func (s *Store) Delete(bucket, key string) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return fmt.Errorf("store: bucket %s does not exist", bucket)
 		}
-	}
 
-	return keys, nil
+		err := b.Delete([]byte(key))
+		if err != nil {
+			return fmt.Errorf("store: could not delete key %s in bucket %s", key, bucket)
+		}
+
+		return nil
+	})
 }
 
 // Backup the database to the given file.
 func (s *Store) Backup(filename string) error {
-	err := s.db.View(func(tx *bolt.Tx) error {
-		file, e := os.Create(filename)
-		if e != nil {
-			return e
+	return s.db.View(func(tx *bolt.Tx) error {
+		file, err := os.Create(filename)
+		if err != nil {
+			return fmt.Errorf("store: could not create backup file %s: %s", filename, err)
 		}
 
 		defer file.Close()
 
-		_, e = tx.WriteTo(file)
-		return e
-	})
+		_, err = tx.WriteTo(file)
+		if err != nil {
+			return fmt.Errorf("store: could not write to backup file %s: %s", filename, err)
+		}
 
-	return err
+		return nil
+	})
 }
 
 // Close closes the connection to the bolt database.
 func (s *Store) Close() error {
-	return s.db.Close()
+	err := s.db.Close()
+	if err != nil {
+		return fmt.Errorf("store: could not close database")
+	}
+
+	return nil
 }
 
 // Create a new store object with a bolt database located at filePath.
 func NewStore(filePath string) (*Store, error) {
+	var err error
+
 	s := new(Store)
 
-	db, err := bolt.Open(filePath, 0640, &bolt.Options{Timeout: 1 * time.Second})
-	if err != nil {
-		return s, err
+	for tries := 1; tries < 20; tries += 2 {
+		timeout := 1 << uint(tries) * time.Millisecond
+
+		db, err := bolt.Open(filePath, 0640, &bolt.Options{Timeout: timeout})
+		if err == nil {
+			s.db = db
+			return s, nil
+		}
 	}
 
-	s.db = db
-
-	return s, nil
+	return nil, fmt.Errorf("store: can not open database %s: %s", filePath, err)
 }
