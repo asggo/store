@@ -1,49 +1,7 @@
-// store provides a simple wrapper for the Bolt key/value database. store allows
-// you to create and delete buckets in the root of the database and allows you
-// to read, write, and delete key/value pairs within a bucket. Currently, store
-// does not support nested buckets.
-//
-// Usage:
-//
-// Storing Key/Value Pairs
-// s := NewStore("/path/to/database/file")
-// err := s.CreateBucket("bucketname")
-// if err != nil {
-//     log.Println("Could not create bucket.")
-// }
-//
-// err = s.Write("bucketname", "key", []byte("value"))
-// if err != nil {
-//     log.Println("Could not write key/value pair.")
-// }
-//
-// val = s.Read("bucketname", "key")
-// err = s.Delete("bucketname", "key")
-// if err != nil {
-//     log.Println("Could not delete key.")
-// }
-//
-//
-// Searching for Keys
-// s := NewStore("/path/to/database/file")
-// keys, err := s.AllKeys("bucketname")
-// if err != nil {
-//     fmt.Println("Could not get keys.")
-// }
-//
-// for _, key := range keys {
-//     // do something with key
-// }
-//
-// // Get all keys with bucket in the name.
-// keys, err := s.FindKeys("bucket")
-// if err != nil {
-//     fmt.Println("Could not get keys.")
-// }
-//
-// for _, key := range keys {
-//     // do something with key
-// }
+// store provides a simple wrapper for the bbolt key/value database. store
+// allows you to create and delete buckets in the root of the database and
+// allows you to read, write, and delete key/value pairs within a bucket.
+// Currently, store does not support nested buckets.
 package store
 
 import (
@@ -55,19 +13,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+// WalkFunc is called for each key/value pair when walking the database.
 type WalkFunc func(key string, val []byte)
-
-type batch struct {
-	bucket string
-	items  map[string][]byte
-	next   string
-	count  int
-}
-
-// NewBatch returns a batch struct that can be used with ReadBatch
-func NewBatch(bucket string, count int) *batch {
-	return &batch{bucket: bucket, count: count}
-}
 
 // Store holds the bolt database
 type Store struct {
@@ -154,29 +101,37 @@ func (s *Store) WalkPrefix(bucket, prefix string, fn WalkFunc) error {
 }
 
 // Read key/value pairs from a bucket in batches of count size. Update the
-// batch with the found items.
-func (s *Store) ReadBatch(bt *batch) error {
-	return s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bt.bucket))
+// batch with the found items. On error, the key/value map will be nil and
+// should not be used.
+func (s *Store) ReadBatch(bucket, next string, count int) (map[string][]byte, string, error) {
+	var items map[string][]byte
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
 		if b == nil {
-			return fmt.Errorf("store: bucket %s does not exist", bt.bucket)
+			return fmt.Errorf("store: bucket %s does not exist", bucket)
 		}
 
+		items = make(map[string][]byte)
 		c := b.Cursor()
 
-		bt.items = make(map[string][]byte)
-
-		for k, v := c.Seek([]byte(bt.next)); k != nil && len(bt.items) < bt.count; k, v = c.Next() {
-			bt.items[string(k)] = v
-			bt.next = string(k)
+		for k, v := c.Seek([]byte(next)); k != nil && len(items) < count; k, v = c.Next() {
+			items[string(k)] = v
+			next = string(k)
 		}
 
-		if len(bt.items) != bt.count {
-			bt.next = ""
+		if len(items) != count {
+			next = ""
 		}
 
 		return nil
 	})
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	return items, next, nil
 }
 
 // Write stores the given key/value pair in the given bucket.

@@ -3,7 +3,7 @@ package store
 import (
 	"fmt"
 	"os"
-	"sort"
+	"strings"
 	"testing"
 )
 
@@ -11,7 +11,7 @@ func TestStore(t *testing.T) {
 	testNewStore(t)
 	testBucket(t)
 	testKey(t)
-	testSearch(t)
+	testWalk(t)
 }
 
 func testNewStore(t *testing.T) {
@@ -37,17 +37,17 @@ func testBucket(t *testing.T) {
 
 	err := s.CreateBucket("bucket")
 	if err != nil {
-		t.Fatal("Unexpected error", err)
+		t.Fatal("Create Bucket: unexpected error", err)
 	}
 
 	err = s.DeleteBucket("bucket")
 	if err != nil {
-		t.Fatal("Unexpected error", err)
+		t.Fatal("Delete Bucket: unexpected error", err)
 	}
 
 	err = s.DeleteBucket("nonexistent")
 	if err == nil {
-		t.Fatal("Expected an error while deleting bucket, got nil")
+		t.Fatal("Delete Bucket: expected an error while deleting bucket, got nil")
 	}
 }
 
@@ -66,31 +66,41 @@ func testKey(t *testing.T) {
 	// Create keys
 	err := s.Write("bucket1", "key1", data1)
 	if err != nil {
-		t.Fatal("Write: unexpected error", err)
+		t.Fatal("Write Key: unexpected error", err)
 	}
 
 	s.Write("bucket1", "key2", data2)
 
 	// Read keys
-	val := s.Read("bucket1", "key1")
+	val, err := s.Read("nonexistent", "key")
+	if err == nil {
+		t.Error("Read Key: expected error reading from nonexistent bucket")
+	}
+
+	val, err = s.Read("bucket1", "nonexistent")
+	if err == nil {
+		t.Error("Read Key: expected error when reading non-existent key")
+	}
+
+	val, _ = s.Read("bucket1", "key1")
 	if string(val) != string(data1) {
 		t.Error("Read: expected", string(data1), "got", string(val))
 	}
 
-	val = s.Read("bucket1", "key2")
+	val, _ = s.Read("bucket1", "key2")
 	if string(val) != string(data2) {
 		t.Error("Read: expected", string(data2), "got", string(val))
 	}
 
 	// Update key2
 	s.Write("bucket1", "key2", data1)
-	val = s.Read("bucket1", "key2")
+	val, _ = s.Read("bucket1", "key2")
 	if string(val) != string(data1) {
 		t.Error("Update: expected", string(data1), "got", string(val))
 	}
 }
 
-func testSearch(t *testing.T) {
+func testWalk(t *testing.T) {
 	// Open a database
 	store, _ := NewStore("test.db")
 	defer store.Close()
@@ -98,44 +108,36 @@ func testSearch(t *testing.T) {
 
 	store.CreateBucket("bucket")
 
-	var all []string
-	var even []string
-
 	for i := 0; i < 100; i++ {
-		s := fmt.Sprintf("odd%d", i)
-
-		if i%2 == 0 {
-			s = fmt.Sprintf("even%d", i)
-			even = append(even, s)
-		}
-
-		all = append(all, s)
-
-		store.Write("bucket", s, nil)
+		store.Write("bucket", fmt.Sprintf("%d", i), nil)
 	}
 
-	sort.Strings(all)
-	sort.Strings(even)
+	var buckets []string
+	store.Walk(func(key string, val []byte) {
+		buckets = append(buckets, key)
+	})
 
-	// Get all keys
-	allKeys, err := store.AllKeys("bucket")
-	if err != nil {
-		t.Error("All Keys: unexpected error", err)
-	}
-	sort.Strings(allKeys)
-
-	if !stringSliceEqual(allKeys, all) {
-		t.Error("Find Keys: expected", all, "got", allKeys)
+	if len(buckets) != 1 || buckets[0] != "bucket" {
+		t.Error("Walk: expected one bucket named bucket got", strings.Join(buckets, " "))
 	}
 
-	evenKeys, err := store.FindKeys("bucket", "even")
-	if err != nil {
-		t.Error("Find Keys: unexpected error", err)
-	}
-	sort.Strings(evenKeys)
+	var keys []string
+	store.WalkBucket("bucket", func (key string, val []byte) {
+		keys = append(keys, key)
+	})
 
-	if !stringSliceEqual(evenKeys, even) {
-		t.Error("Find Keys: expected", even, "got", evenKeys)
+	if len(keys) != 100 {
+		t.Error("WalkBucket: expected 100 keys got", len(keys))
+	}
+
+	var tens []string
+	store.WalkPrefix("bucket", "1", func(key string, val []byte) {
+		fmt.Println(key)
+		tens = append(tens, key)
+	})
+
+	if len(tens) != 11 {
+		t.Error("WalkPrefix: expected 11 keys got", len(tens))
 	}
 }
 
